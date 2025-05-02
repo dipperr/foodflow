@@ -97,7 +97,7 @@ class Graficos:
         def definir_cores(classi):
             cores = {
                 "sem class.": "#ffeb3b",
-                "vendas": "#4caf50",
+                "compras": "#4caf50",
                 "desperdício": "#e57373"
             }
             return cores.get(classi, "blue")

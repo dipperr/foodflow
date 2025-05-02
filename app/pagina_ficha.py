@@ -78,16 +78,16 @@ class JanelaExcluir(ft.AlertDialog):
 
 
 class LinhaFicha(ft.Column):
-    def __init__(self, produto):
+    def __init__(self, nome, infos):
         super().__init__(spacing=0)
         self.controls = [
             ft.ResponsiveRow([
                 ft.Text(
                     spans=[
-                        ft.TextSpan(f"{produto[0]} {produto[1]}", ft.TextStyle(weight=ft.FontWeight.BOLD, size=15)),
+                        ft.TextSpan(f"{infos["quantidade"]} {infos["unidade"]}", ft.TextStyle(weight=ft.FontWeight.BOLD, size=15)),
                         ft.TextSpan(" de "),
                         ft.TextSpan(
-                            f"{produto[2]}", ft.TextStyle(weight=ft.FontWeight.BOLD, size=15)
+                            f"{nome}", ft.TextStyle(weight=ft.FontWeight.BOLD, size=15)
                         )
                     ],
                     col=8.5,
@@ -97,7 +97,7 @@ class LinhaFicha(ft.Column):
                     overflow=ft.TextOverflow.ELLIPSIS
                 ),
                 ft.Text(
-                    f"custo: {locale.currency(produto[4], grouping=True)}",
+                    f"custo: {locale.currency(infos["valor"], grouping=True)}",
                     col=3.5,
                     size=15,
                     color=ft.Colors.BLACK54,
@@ -167,8 +167,8 @@ class CartaoFT(ft.Card):
             ft.Column([
                 ft.Text("Produtos", weight=ft.FontWeight.W_400, color=ft.Colors.BLACK54, size=17),
                 ft.Column([
-                    LinhaFicha(produto)
-                    for produto in self.ficha["ingredientes"]["itens"]
+                    LinhaFicha(nome, infos)
+                    for nome, infos in self.ficha["ingredientes"].items()
                 ]),
                 ft.ResponsiveRow([
                     ft.OutlinedButton(
@@ -206,7 +206,7 @@ class CartaoFT(ft.Card):
         self.page.open(janela)
 
     def _calcular_custo(self):
-        return sum([item[4] for item in self.ficha["ingredientes"]["itens"]])
+        return sum([infos["valor"] for infos in self.ficha["ingredientes"].values()])
 
     def visibilidade_painel(self, e):
         self.painel.visible = not self.painel.visible
@@ -342,12 +342,12 @@ class LinhaProduto(ft.ResponsiveRow):
         ]
 
     def obter_valores(self):
-        return (
-            self.controls[0].value.replace(",", "."),
-            self.controls[1].value,
-            self.produto.split("(")[0].strip(),
-            self.id
-        )
+        return {
+            "id": self.id,
+            "nome": self.produto.split("(")[0].strip(),
+            "unidade": self.controls[1].value,
+            "quantidade": self.controls[0].value.replace(",", ".")
+        }
 
 
 class DropdownV2(ft.PopupMenuButton):
@@ -647,13 +647,13 @@ class PaginaFT(ft.Column):
         produtos_dict = {produto["id"]: produto for produto in self.produtos}
         
         for ficha in self.fichas:
-            for produto_ficha in ficha["ingredientes"]["itens"]:
-                produto_id = produto_ficha[3]
+            for produto_ficha in ficha["ingredientes"].values():
+                produto_id = produto_ficha["id"]
                 
                 if produto_id in produtos_dict:
                     produto = produtos_dict[produto_id]
-                    valor = round(produto["preco_unidade"] * float(produto_ficha[0]), 2)
-                    produto_ficha.append(valor)
+                    valor = round(produto["preco_unidade"] * float(produto_ficha["quantidade"]), 2)
+                    produto_ficha.update({"valor": valor})
 
     def atualizar_dados(self):
         self.ler_dados()

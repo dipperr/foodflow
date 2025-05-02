@@ -99,7 +99,8 @@ class BotaoTonal(ft.FilledTonalButton):
         bgcolor: str=ft.Colors.BLUE_100,
         on_click: Callable=None,
         icon_color: str = ft.Colors.BLACK87,
-        text_color: str = ft.Colors.BLACK87
+        text_color: str = ft.Colors.BLACK87,
+        visible: bool = True
     ):
         super().__init__(
             content=ft.ResponsiveRow([
@@ -118,7 +119,8 @@ class BotaoTonal(ft.FilledTonalButton):
             style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=5)),
             bgcolor=bgcolor,
             on_click=on_click,
-            elevation=5
+            elevation=5,
+            visible=visible
         )
 
 
@@ -450,8 +452,8 @@ class ControleFichaTecnica:
         self.visualizacao = visualizacao
 
     def criar_ficha(self, nome, unidade, porcao, estoque, produtos):
-        print(nome, unidade, porcao, estoque, produtos)
         porcao = self._formatar_valores(porcao)
+        JSON = self._criar_json(produtos)
         try:
             client = self.db.get_client()
             (
@@ -462,9 +464,7 @@ class ControleFichaTecnica:
                     "unidade": unidade,
                     "qtd_porcao": porcao[0],
                     "estoque": estoque,
-                    "ingredientes": {
-                        "itens": produtos
-                    }
+                    "ingredientes": JSON
                 })
                 .execute()
             )
@@ -489,3 +489,8 @@ class ControleFichaTecnica:
 
     def _formatar_valores(self, *args):
             return [float(arg.replace(",", ".")) if arg is not None else None for arg in args]
+    
+    def _criar_json(self, produtos):
+        return {
+            produto.pop("nome"): produto for produto in produtos
+        }

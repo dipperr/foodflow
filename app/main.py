@@ -361,7 +361,7 @@ class App(ft.Container):
         self.update()
 
     def did_mount(self):
-        self.area.atualizar_conteudo(PaginaCompras(self.controle_sombra))
+        self.area.atualizar_conteudo(Painel())
 
 
 def main(page):
