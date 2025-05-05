@@ -22,45 +22,6 @@ UNIDADES = [
 ]
 
 
-class InfosGlobal:
-    _instance = None
-
-    def __new__(cls,
-        usuario_id=None,
-        usuario_nome=None,
-        empresa_id=None,
-        empresa_nome=None
-    ):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance.u_id = usuario_id
-            cls._instance.u_nome = usuario_nome
-            cls._instance.e_id = empresa_id
-            cls._instance.e_nome = empresa_nome
-        return cls._instance
-
-    def atualizar(self, usuario_id, usuario_nome, empresa_id, empresa_nome):
-        self.usuario_id = usuario_id
-        self.usuario_nome = usuario_nome
-        self.empresa_id = empresa_id
-        self.empresa_nome = empresa_nome
-
-
-class CoresGlobal:
-    _instance = None
-
-    def __new__(cls,
-        cores=None
-    ):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance.cores = cores
-        return cls._instance
-
-    def atualizar(self, cores):
-        self.cores = cores
-
-
 class Produto:
     def __init__(
         self,

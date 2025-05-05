@@ -3,8 +3,32 @@ import pytz
 from datetime import datetime
 from typing import Callable, List, Optional
 
-from modelos import Produto, InfosGlobal, CoresGlobal
+from modelos import Produto
 from banco_de_dados import SupabaseSingleton
+
+
+class InfosGlobal:
+    _instance = None
+
+    def __new__(cls,
+        usuario_id=None,
+        usuario_nome=None,
+        empresa_id=None,
+        empresa_nome=None
+    ):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.u_id = usuario_id
+            cls._instance.u_nome = usuario_nome
+            cls._instance.e_id = empresa_id
+            cls._instance.e_nome = empresa_nome
+        return cls._instance
+
+    def atualizar(self, usuario_id, usuario_nome, empresa_id, empresa_nome):
+        self.usuario_id = usuario_id
+        self.usuario_nome = usuario_nome
+        self.empresa_id = empresa_id
+        self.empresa_nome = empresa_nome
 
 
 class GradeNotificacao(ft.ResponsiveRow):
@@ -147,11 +171,10 @@ class CartaoIndicadores(ft.Card):
 
 
 class CapsulaCategoria(ft.Container):
-    def __init__(self, categoria):
+    def __init__(self, categoria, cor):
         super().__init__()
-        cores = CoresGlobal()
         self.content = ft.Text(categoria, weight=ft.FontWeight.W_600, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS)
-        self.bgcolor=eval(f"ft.{cores.cores[categoria.lower()]}")
+        self.bgcolor=eval(f"ft.{cor}")
         self.border_radius=30
         self.col=int(len(categoria) / 2) + 1
         self.padding=ft.padding.only(left=10, top=5, right=10, bottom=5)
@@ -171,16 +194,13 @@ class ControleProduto:
         qtd_estoque: str,
         estoque_min: str,
         preco: Optional[str],
-        categorias: Optional[List[dict]],
+        categorias: Optional[dict],
         fornecedores: Optional[List[dict]],
         cmv: bool
     ):
         qtd_estoque, estoque_min, preco = self._formatar_valores(qtd_estoque, estoque_min, preco)
         try:
             client = self.db.get_client()
-            
-            if categorias is not None:
-                categorias = [cats["nome"] for cats in categorias]
 
             if fornecedores is not None:
                 fornecedores = [forns["nome"] for forns in fornecedores]
@@ -196,9 +216,7 @@ class ControleProduto:
                         "estoque_minimo": estoque_min,
                         "preco_unidade": preco,
                         "cmv": cmv,
-                        "categorias": {
-                            "nomes": categorias
-                        },
+                        "categorias": categorias,
                         "fornecedores": {
                             "nomes": fornecedores
                         }

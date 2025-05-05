@@ -11,8 +11,9 @@ from pagina_compras import PaginaCompras
 from modelos import (
     Usuario,
     Empresa,
-    InfosGlobal,
-    CoresGlobal
+)
+from controles import (
+    InfosGlobal
 )
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -346,22 +347,15 @@ class App(ft.Container):
         self.controle_sombra = ControleSombra(self.menu_lateral.sombra, self.area.sombra_area)
 
         self.content = ft.ResponsiveRow([self.menu_lateral, self.area], expand=True, spacing=0)
-        self._obter_cores()
         # self.update()
         # self.area.atualizar_conteudo(Painel())
-
-    def _obter_cores(self):
-        db = SupabaseSingleton()
-        client = db.get_client()
-        respostas = client.table("categoria").select("*").execute()
-        cores = CoresGlobal({resposta["nome"]: resposta["cor"] for resposta in respostas.data})
     
     def logoff(self):
         self.content = Login(ControleConteudo(self))
         self.update()
 
     def did_mount(self):
-        self.area.atualizar_conteudo(Painel())
+        self.area.atualizar_conteudo(Estoque(self.controle_sombra))
 
 
 def main(page):

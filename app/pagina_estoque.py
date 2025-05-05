@@ -1,5 +1,5 @@
 import flet as ft
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Union
 import locale
 import pandas as pd
 from datetime import datetime
@@ -8,11 +8,17 @@ from dateutil import parser
 from banco_de_dados import SupabaseSingleton
 from modelos import (
     Produto,
-    InfosGlobal,
     Movimentacao,
     UNIDADES
 )
 from controles import (
+    ControleProduto,
+    ControleCategoria,
+    ControleFornecedores,
+    ControleMovimentacao,
+    InfosGlobal
+)
+from componentes import (
     RotuloColuna,
     TextoMonetario,
     GradeNotificacao,
@@ -20,109 +26,15 @@ from controles import (
     BotaoTonal,
     CartaoIndicadores,
     CapsulaCategoria,
-    ControleProduto,
-    ControleCategoria,
-    ControleFornecedores,
-    ControleMovimentacao
+    TextField,
+    Filtro
 )
 
 locale.setlocale(locale.LC_ALL, "pt_BR.UTF-8")
 
 
-class TextField(ft.Column):
-    def __init__(
-        self,
-        label,
-        col,
-        subtitulo=None,
-        value=None,
-        placeholder=None,
-        on_change=None,
-        input_filter=None,
-        visible=True
-    ):
-        super().__init__(
-            col=col,
-            spacing=5,
-            visible=visible
-        )
-        self.entrada = ft.TextField(
-            value=value,
-            hint_text=placeholder,
-            border_radius=15,
-            border_color=ft.Colors.BLACK54,
-            cursor_color=ft.Colors.BLACK54,
-            on_change=on_change,
-            input_filter=input_filter,
-        )
-        self.controls = [
-            ft.Text(label, weight=ft.FontWeight.W_500),
-            ft.Text(
-                subtitulo,
-                size=13,
-                color=ft.Colors.BLACK54,
-                weight=ft.FontWeight.W_400,
-            ) if subtitulo else ft.Row(),
-            self.entrada
-        ]
-    
-    @property
-    def value(self):
-        return self.entrada.value if self.entrada.value else None
-    
-    def atualizar_rotulo(self, rotulo):
-        self.controls[0].value = rotulo
-        self.controls[0].update()
-
-
-class Filtro(ft.Container):
-    def __init__(
-            self,
-            rotulo: str,
-            itens: List[str],
-            checked=None,
-            botao: Callable[[None], None]=None
-        ):
-        super().__init__(
-            col=3,
-            border=ft.border.all(1, ft.Colors.BLACK54),
-            border_radius=5,
-            padding=ft.padding.all(7),
-            alignment=ft.alignment.center
-        ),
-        self.botao = botao
-        self.checked = checked
-        self.menu = ft.PopupMenuButton(
-            content=ft.ResponsiveRow([
-                ft.Image("./icons_clone//bars-filter.png", col=2, width=16, height=16),
-                ft.Text(rotulo, col=8, weight=ft.FontWeight.W_500),
-                ft.Image("./icons_clone/angles-up-down.png", width=16, height=16, col=2)
-            ], vertical_alignment=ft.MainAxisAlignment.CENTER),
-            items=[
-                ft.PopupMenuItem(text=label, checked=(checked == i), on_click=self.check_clique)
-                for i, label in enumerate(itens)
-            ],
-            bgcolor=ft.Colors.WHITE,
-            tooltip=""
-        )
-        self.content = self.menu
-
-    def check_clique(self, e):
-        if self.checked is None:
-            self.botao()
-
-        for item in self.menu.items:
-            item.checked = (item.text == e.control.text)
-        self.menu.update()
-
-    def limpar(self):
-        for item in self.menu.items:
-            item.checked = False
-        self.menu.update()
-
-
 class FiltrosEstoque(ft.ResponsiveRow):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             controls=[
                 Filtro(
@@ -140,7 +52,7 @@ class FiltrosEstoque(ft.ResponsiveRow):
                 Filtro(
                     "Compõe CMV?",
                     ["Sim", "Não"],
-                    botao=self.mostrar_botao
+                    mostrar_botao=self.mostrar_botao
                 ),
                 Filtro(
                     "Ordenar por:",
@@ -167,73 +79,296 @@ class FiltrosEstoque(ft.ResponsiveRow):
             ]
         )
 
-    def limpar_filtros(self, e):
+    def limpar_filtros(self, e: ft.ControlEvent) -> None:
         for filtro in self.controls[:-2]:
             filtro.limpar()
         self.controls[-1].visible = False
         self.controls[-1].update()
 
-    def mostrar_botao(self):
+    def mostrar_botao(self) -> None:
         self.controls[-1].visible = True
         self.controls[-1].update()
 
 
 class OperadorProduto:
-    def __init__(self, produto):
+    def __init__(self, produto: Produto) -> None:
         self.produto = produto
     
-    def formatar_valores(self):
-        preco = 0 if pd.isnull(self.produto.preco) else self.produto.preco
+    def formatar_valores(self) -> None:
+        preco = 0.0 if pd.isnull(self.produto.preco) else self.produto.preco
         valor_estoque = preco * self.produto.qtd_estoque
         qtd_estoque = self._formatar_quantidade(self.produto.qtd_estoque)
         estoque_min = self._formatar_quantidade(self.produto.estoque_min)
         return preco, valor_estoque, qtd_estoque, estoque_min
     
-    def _formatar_quantidade(self, qtd):
-        qtd_str = str(qtd)
-        if "." in qtd_str:
-            apos_ponto = int(qtd_str.split(".")[1])
-            qtd = qtd if apos_ponto > 0 else int(qtd)
-        qtd = str(qtd).replace(".", ",")
-        unidade = self.produto.unidade.split(" ")[1].strip("()")
-        return f"{qtd} {unidade}"
+    def _formatar_quantidade(self, qtd: Union[int, float]) -> str:
+        if isinstance(qtd, float) and qtd.is_integer():
+            qtd = int(qtd)
+        qtd_str = str(qtd).replace(".", ",")
 
-    def obter_categorias(self):
         try:
-            if not pd.isnull(self.produto.categorias):
-                return ft.Row(
-                    [
-                        CapsulaCategoria(categoria)
-                        for categoria in self.produto.categorias["nomes"]
-                    ]
-                )
-            else:
-                return ft.Row([])
-        except Exception as e:
-            return ft.Row([])
+            unidade = self.produto.unidade.split(" ")[1].strip("()")
+        except (IndexError, AttributeError):
+            unidade = ""
+        return f"{qtd_str} {unidade}"
+
+    def obter_categorias(self) -> None:
+        categorias = getattr(self.produto, "categorias", None)
+        if isinstance(categorias, dict) and categorias:
+            return ft.Row([CapsulaCategoria(cat, cor) for cat, cor in categorias.items()])
+        return ft.Row([])
         
-    def obter_fornecedores(self):
-        try:
-            if not pd.isnull(self.produto.fornecedores):
-                return ft.ResponsiveRow([
-                    ft.Text(
-                        " | ".join([
-                            fornecedor.upper()
-                            for fornecedor in self.produto.fornecedores["nomes"]
-                        ]), col=12, size=13
+    def obter_fornecedores(self) -> None:
+        fornecedores = getattr(self.produto, "fornecedores", None)
+        nomes = fornecedores.get("nomes") if isinstance(fornecedores, dict) else None
+        if isinstance(nomes, list) and nomes:
+            texto = " | ".join(f.upper() for f in nomes)
+            return ft.ResponsiveRow([ft.Text(texto, col=12, size=13)])
+        return ft.ResponsiveRow([])
+
+
+class PainelInfos(ft.Container):
+    def __init__(self, controle_sombra) -> None:
+        super().__init__(
+            expand=True,
+            visible=False,
+            bgcolor=ft.Colors.GREY_100
+        )
+        self.controle_sombra = controle_sombra
+        self.produto = None
+        self.janela = None
+
+    def criar_conteudo(self) -> None:
+        op = OperadorProduto(self.produto)
+        preco, valor_estoque, qtd_estoque, estoque_min = op.formatar_valores()
+        self.content = ft.Column([
+            ft.Container(
+                ft.Column([
+                    ft.Container(
+                        ft.ResponsiveRow([
+                            ft.IconButton(
+                                content=ft.Image("./icons_clone/arrow-left.png"),
+                                on_click=self.fechar_janela,
+                                col=0.7
+                            ),
+                            ft.Text(self.produto.nome.title(), col=12, size=20, weight=ft.FontWeight.BOLD),
+                            ft.Divider(),
+                            op.obter_fornecedores(),
+                            op.obter_categorias(),
+                            self._cartoes(qtd_estoque, estoque_min, preco, valor_estoque),
+                            ft.Divider(),
+                            self._criar_botoes(),
+                            ft.ResponsiveRow([ft.Text("Movimentações e Históricos", col=12, color=ft.Colors.BLACK54)]),
+                            self._movimentacoes()
+                        ]), bgcolor=ft.Colors.GREY_100, expand=True, padding=ft.padding.all(20),
                     )
-                ])
-            else:
-                return ft.Row([])
+                ], scroll=ft.ScrollMode.ALWAYS),
+            expand=True)
+        ])
+        self.update()
+
+    def _criar_botoes(self) -> ft.ResponsiveRow:
+        return ft.ResponsiveRow([
+            BotaoTonal(
+                "Registrar Movimentação",
+                "./icons_clone/exchange.png",
+                3,
+                on_click=self._registrar_movimentacao
+            ),
+            BotaoTonal(
+                "Editar Produto",
+                "./icons_clone/pencil.png",
+                3,
+                on_click=self._editar_produto
+            ),
+            BotaoTonal(
+                "Excluir",
+                "./icons_clone/trash.png",
+                2,
+                ft.Colors.WHITE,
+                icon_color=ft.Colors.RED,
+                text_color=ft.Colors.RED
+            )
+        ])
+
+    def _registrar_movimentacao(self, e: ft.ControlEvent) -> None:
+        controle = ControleMovimentacao(self)
+        self.janela = JanelaRegistrarMovimentacao(self.produto, controle)
+        self.page.open(self.janela)
+
+    def _editar_produto(self, e: ft.ControlEvent) -> None:
+        controle = ControleProduto(visualizacao=self)
+        self.janela = JanelaEditarProduto(self.produto, controle)
+        self.page.open(self.janela)
+
+    def _cartoes(
+        self,
+        qtd_estoque: float,
+        estoque_min: float,
+        preco: float,
+        valor_estoque: float
+    ) -> ft.ResponsiveRow:
+        return ft.ResponsiveRow([
+            CartaoIndicadores(
+                "Quantidade",
+                ft.Row([
+                    ft.Text(qtd_estoque, size=20, weight=ft.FontWeight.BOLD)
+                ]),
+                3
+            ),
+            CartaoIndicadores(
+                "Estoque mínimo",
+                ft.Row([
+                    ft.Text(estoque_min, size=20, weight=ft.FontWeight.BOLD)
+                ]),
+                3
+            ),
+            CartaoIndicadores(
+                "Preço unitário",
+                ft.Row([
+                    ft.Text(
+                        locale.currency(preco, grouping=True),
+                        size=20,
+                        weight=ft.FontWeight.BOLD
+                    )
+                ]),
+                3
+            ),
+            CartaoIndicadores(
+                "Valor do estoque",
+                ft.Row([
+                    ft.Text(
+                        locale.currency(valor_estoque, grouping=True),
+                        size=20,
+                        weight=ft.FontWeight.BOLD
+                    )
+                ]),
+                3
+            ),
+            CartaoIndicadores(
+                "Unidade(s)",
+                ft.ResponsiveRow([
+                    ft.Text(
+                        "Este produto pode ser movimentado em ",
+                        spans=[
+                            ft.TextSpan(
+                                self.produto.unidade,
+                                style=ft.TextStyle(
+                                    weight=ft.FontWeight.BOLD
+                                )
+                            )
+                        ],
+                        weight=ft.FontWeight.W_600,
+                        col=12
+                    )
+                ]),
+                6
+            ),
+            CartaoIndicadores(
+                "Lotes com validade",
+                ft.Column([
+                    ft.ResponsiveRow([ft.Text("Nenhum lote cadastrados", weight=ft.FontWeight.W_600, col=12)]),
+                    ft.ResponsiveRow([
+                        BotaoTonal("Cadastrar Lote", "./icons_clone/calendar-plus16.png", 4)
+                    ])
+                ]),
+                6
+            )
+        ])
+
+    def _movimentacoes(self) -> None:
+        try:
+            client = SupabaseSingleton().get_client()
+            respostas = (
+                client.table("movimentacao")
+                .select("*")
+                .eq("id_produto", self.produto.id)
+                .order("data_movimentacao", desc=True)
+                .execute()
+            ).data
         except Exception as e:
-            return ft.Row([])
+            print(e)
+            return ft.ResponsiveRow([])
+        else:
+            respostas_form = [
+                [
+                    mov["id"],
+                    mov["operacao"],
+                    mov["classificacao"],
+                    parser.isoparse(mov["data_movimentacao"]),
+                    self.produto.nome,
+                    mov["quantidade"],
+                    self.produto.unidade,
+                    self.obter_preco(mov["preco_movimentacao"]),
+                    mov["informacoes"]
+                ]
+                for mov in respostas
+            ]
+
+            return ft.ResponsiveRow([
+                ft.Card(
+                    ft.Container(
+                        ft.Column([
+                            LinhaHistorico(*dado)
+                            for dado in respostas_form
+                        ]),
+                        padding=ft.padding.symmetric(vertical=10, horizontal=0),
+                        bgcolor=ft.Colors.WHITE,
+                        border_radius=ft.border_radius.all(15),
+                    ), col=12
+                )
+            ])
+    
+    def obter_preco(self, preco_mov: Optional[float]) -> float:
+        return preco_mov if pd.notna(preco_mov) else self.produto.preco
+
+    def atualizar_conteudo(self, **kwars) -> None:
+        if self.janela is not None:
+            self.page.close(self.janela)
+            self.janela = None
+
+        for k, v in kwars.items():
+            setattr(self.produto, k, v)
+
+        self.placeholder()
+        self.criar_conteudo()
+        self.update()
+
+    def abrir_janela(self, produto: Produto) -> None:
+        self.produto = produto
+        self.placeholder()
+        self.criar_conteudo()
+        self.update()
+
+    def fechar_janela(self, e: ft.ControlEvent) -> None:
+        self.produto = None
+        self.controle_sombra.visibilidade(False)
+        self.visible = False
+        self.update()
+
+    def placeholder(self) -> None:
+        self.content = ft.Container(
+            ft.ProgressRing(), expand=True, alignment=ft.alignment.center
+        )
+        self.visible = True
+        self.update()
+
+
+class ControlePainelInfos:
+    def __init__(self, painel_infos, controle_sombra) -> None:
+        self.painel_infos = painel_infos
+        self.controle_sombra = controle_sombra
+
+    def abrir_janela(self, produto: Produto) -> None:
+        self.controle_sombra.visibilidade(True)
+        self.painel_infos.abrir_janela(produto)
 
 
 class CartaoItem(ft.Card):
-    def __init__(self, produto: Produto, cjc):
+    def __init__(self, produto: Produto, controle_painel_infos: ControlePainelInfos):
         super().__init__(col=4, elevation=10)
         self.produto = produto
-        self.cjc = cjc
+        self.controle_painel_infos = controle_painel_infos
         self._criar_conteudo()
 
     def _criar_conteudo(self):
@@ -332,7 +467,7 @@ class CartaoItem(ft.Card):
         )
 
     def abrir_configuracoes(self, e):
-        self.cjc.abrir_janela(self.produto)
+        self.controle_painel_infos.abrir_janela(self.produto)
 
 
 class SeletorShowItens(ft.Container):
@@ -367,16 +502,6 @@ class SeletorShowItens(ft.Container):
             ),
             show_selected_icon=False
         )
-
-
-class ControlePainelInfos:
-    def __init__(self, painel_infos, controle_sombra):
-        self.painel_infos = painel_infos
-        self.controle_sombra = controle_sombra
-
-    def abrir_janela(self, produto):
-        self.controle_sombra.visibilidade(True)
-        self.painel_infos.abrir_janela(produto)
 
 
 class JanelaEditarMovimentacao(ft.AlertDialog):
@@ -1218,226 +1343,6 @@ class JanelaEditarProduto(ft.AlertDialog):
             self._criar_conteudo(categorias.data, fornecedores.data)
 
 
-class PainelInfos(ft.Container):
-    def __init__(self, controle_sombra):
-        super().__init__(
-            expand=True,
-            visible=False,
-            bgcolor=ft.Colors.GREY_100
-        )
-        self.controle_sombra = controle_sombra
-        self.produto = None
-        self.janela = None
-
-    def criar_conteudo(self):
-        op = OperadorProduto(self.produto)
-        preco, valor_estoque, qtd_estoque, estoque_min = op.formatar_valores()
-        categorias = op.obter_categorias()
-        fornecedores = op.obter_fornecedores()
-        self.content = ft.Column([
-            ft.Container(
-                ft.Column([
-                    ft.Container(
-                        ft.ResponsiveRow([
-                            ft.IconButton(
-                                content=ft.Image("./icons_clone/arrow-left.png"),
-                                on_click=self.fechar_janela,
-                                col=0.7
-                            ),
-                            ft.Text(self.produto.nome.title(), col=12, size=20, weight=ft.FontWeight.BOLD),
-                            ft.Divider(),
-                            fornecedores,
-                            categorias,
-                            self._cartoes(qtd_estoque, estoque_min, preco, valor_estoque),
-                            ft.Divider(),
-                            ft.ResponsiveRow([
-                                BotaoTonal(
-                                    "Registrar Movimentação",
-                                    "./icons_clone/exchange.png",
-                                    3,
-                                    on_click=self._registrar_movimentacao
-                                ),
-                                BotaoTonal(
-                                    "Editar Produto",
-                                    "./icons_clone/pencil.png",
-                                    3,
-                                    on_click=self._janela_editar_produto
-                                ),
-                                BotaoTonal(
-                                    "Excluir",
-                                    "./icons_clone/trash.png",
-                                    2,
-                                    ft.Colors.WHITE,
-                                    icon_color=ft.Colors.RED,
-                                    text_color=ft.Colors.RED
-                                )
-                            ]),
-                            ft.ResponsiveRow([ft.Text("Movimentações e Históricos", col=12, color=ft.Colors.BLACK54)]),
-                            self._movimentacoes()
-                        ]), bgcolor=ft.Colors.GREY_100, expand=True, padding=ft.padding.all(20),
-                    )
-                ], scroll=ft.ScrollMode.ALWAYS),
-            expand=True)
-        ])
-        self.update()
-
-    def placeholder(self):
-        self.content = ft.Container(
-            ft.ProgressRing(), expand=True, alignment=ft.alignment.center
-        )
-        self.visible = True
-        self.update()
-
-    def _registrar_movimentacao(self, e):
-        controle = ControleMovimentacao(visualizacao=self)
-        self.janela = JanelaRegistrarMovimentacao(self.produto, controle)
-        self.page.open(self.janela)
-
-    def _janela_editar_produto(self, e):
-        controle = ControleProduto(visualizacao=self)
-        self.janela = JanelaEditarProduto(self.produto, controle)
-        self.page.open(self.janela)
-
-    def _cartoes(self, qtd_estoque, estoque_min, preco, valor_estoque):
-        return ft.ResponsiveRow([
-            CartaoIndicadores(
-                "Quantidade",
-                ft.Row([
-                    ft.Text(qtd_estoque, size=20, weight=ft.FontWeight.BOLD)
-                ]),
-                3
-            ),
-            CartaoIndicadores(
-                "Estoque mínimo",
-                ft.Row([
-                    ft.Text(estoque_min, size=20, weight=ft.FontWeight.BOLD)
-                ]),
-                3
-            ),
-            CartaoIndicadores(
-                "Preço unitário",
-                ft.Row([
-                    ft.Text(
-                        locale.currency(preco, grouping=True),
-                        size=20,
-                        weight=ft.FontWeight.BOLD
-                    )
-                ]),
-                3
-            ),
-            CartaoIndicadores(
-                "Valor do estoque",
-                ft.Row([
-                    ft.Text(
-                        locale.currency(valor_estoque, grouping=True),
-                        size=20,
-                        weight=ft.FontWeight.BOLD
-                    )
-                ]),
-                3
-            ),
-            CartaoIndicadores(
-                "Unidade(s)",
-                ft.ResponsiveRow([
-                    ft.Text(
-                        "Este produto pode ser movimentado em ",
-                        spans=[
-                            ft.TextSpan(
-                                self.produto.unidade,
-                                style=ft.TextStyle(
-                                    weight=ft.FontWeight.BOLD
-                                )
-                            )
-                        ],
-                        weight=ft.FontWeight.W_600,
-                        col=12
-                    )
-                ]),
-                6
-            ),
-            CartaoIndicadores(
-                "Lotes com validade",
-                ft.Column([
-                    ft.ResponsiveRow([ft.Text("Nenhum lote cadastrados", weight=ft.FontWeight.W_600, col=12)]),
-                    ft.ResponsiveRow([
-                        BotaoTonal("Cadastrar Lote", "./icons_clone/calendar-plus16.png", 4)
-                    ])
-                ]),
-                6
-            )
-        ])
-
-    def _movimentacoes(self):
-        try:
-            client = SupabaseSingleton().get_client()
-            respostas = (
-                client.table("movimentacao")
-                .select("*")
-                .eq("id_produto", self.produto.id)
-                .order("data_movimentacao", desc=True)
-                .execute()
-            )
-        except Exception as e:
-            print(e)
-            return ft.ResponsiveRow([])
-        else:
-            respostas_form = [
-                [
-                    resposta["id"],
-                    resposta["operacao"],
-                    resposta["classificacao"],
-                    parser.isoparse(resposta["data_movimentacao"]),
-                    self.produto.nome,
-                    resposta["quantidade"],
-                    self.produto.unidade,
-                    self.obter_preco(resposta["preco_movimentacao"]),
-                    resposta["informacoes"]
-                ]
-                for resposta in respostas.data
-            ]
-            movimentacoes = ft.ResponsiveRow([
-                ft.Card(
-                    ft.Container(
-                        ft.Column([
-                            LinhaHistorico(*dado)
-                            for dado in respostas_form
-                        ]),
-                        padding=ft.padding.symmetric(vertical=10, horizontal=0),
-                        bgcolor=ft.Colors.WHITE,
-                        border_radius=ft.border_radius.all(15),
-                    ), col=12
-                )
-            ])
-            return movimentacoes
-    
-    def obter_preco(self, preco_mov):
-        return preco_mov if pd.notna(preco_mov) else self.produto.preco
-
-    def atualizar_conteudo(self, **kwars):
-        if self.janela is not None:
-            self.page.close(self.janela)
-            self.janela = None
-
-        for k, v in kwars.items():
-            setattr(self.produto, k, v)
-
-        self.placeholder()
-        self.criar_conteudo()
-        self.update()
-
-    def abrir_janela(self, produto):
-        self.produto = produto
-        self.placeholder()
-        self.criar_conteudo()
-        self.update()
-
-    def fechar_janela(self, e):
-        self.produto = None
-        self.controle_sombra.visibilidade(False)
-        self.visible = False
-        self.update()
-
-
 class CapsulaDropdown(ft.Container):
     def __init__(self, rotulo: str, id: int, on_click: Callable[[int], None]):
         super().__init__(
@@ -1936,13 +1841,14 @@ class JanelaCadProduto(ft.AlertDialog):
 
     def criar_produto(self, e):
         if self.controle_produto is not None:
+            categorias = {cat["nome"]: self.infos_categorias[cat["id"]] for cat in self.f_categoria.value}
             self.controle_produto.criar_produto(
                 self.f_nome_produto.value,
                 self.f_unidade.value,
                 self.f_qtd_estoque.value,
                 self.f_estoque_min.value,
                 self.f_preco_unidade.value,
-                self.f_categoria.value,
+                categorias,
                 self.f_fornecedores.value,
                 self.check_sim.value
             )
@@ -1961,17 +1867,18 @@ class JanelaCadProduto(ft.AlertDialog):
                 .select("*")
                 .eq("empresa_id", ig.empresa_id)
                 .execute()
-            )
+            ).data
             fornecedores = (
                 client.table("fornecedores")
                 .select("*")
                 .eq("empresa_id", ig.empresa_id)
                 .execute()
-            )
+            ).data
         except Exception as e:
             print(e)
-        finally:
-            self._criar_conteudo(categorias.data, fornecedores.data)
+        else:
+            self.infos_categorias = {cat["id"]: cat["cor"] for cat in categorias}
+            self._criar_conteudo(categorias, fornecedores)
             
 
 class Estoque(ft.Stack):
@@ -2120,9 +2027,11 @@ class Estoque(ft.Stack):
             )
         if sem_preco:
             cards.append(
-                "Produtos sem preço",
-                "Configurar os preços dos seus produtos possibilita o cálculo correto do seu estoque total, do seu CMV, do custo de suas fichas técnicas, entre outros.",
-                sem_preco
+                criar_cartao(
+                    "Produtos sem preço",
+                    "Configurar os preços dos seus produtos possibilita o cálculo correto do seu estoque total, do seu CMV, do custo de suas fichas técnicas, entre outros.",
+                    sem_preco
+                )
             )
 
         return cards
