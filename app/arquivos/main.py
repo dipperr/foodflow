@@ -203,30 +203,12 @@ class Login(ft.Container):
         ])
 
     def _criar_entradas(self) -> None:
-        self.entrada_telefone = ft.TextField(
-            label="Telefone",
-            prefix_text="(67) ",
-            border_radius=10,
-            border_color=ft.Colors.BLACK54,
-            cursor_height=15,
-            content_padding=ft.padding.only(top=0, left=10),
-            text_style=ft.TextStyle(foreground=ft.Paint(color=ft.Colors.BLACK54)),
-            label_style=ft.TextStyle(foreground=ft.Paint(color=ft.Colors.BLACK54)),
-            input_filter=ft.NumbersOnlyInputFilter(),
-            on_change=self._liberar_botao_entrar
+        self.entrada_telefone = self._criar_field(
+            "Telefone",
+            "(67) ",
+            ft.NumbersOnlyInputFilter()
         )
-        self.entrada_senha = ft.TextField(
-            label="Senha",
-            border_radius=10,
-            border_color=ft.Colors.BLACK54,
-            cursor_height=15,
-            content_padding=ft.padding.only(top=0, left=10),
-            text_style=ft.TextStyle(foreground=ft.Paint(color=ft.Colors.BLACK54)),
-            label_style=ft.TextStyle(foreground=ft.Paint(color=ft.Colors.BLACK54)),
-            password=True,
-            can_reveal_password=True,
-            on_change=self._liberar_botao_entrar
-        )
+        self.entrada_senha = self._criar_field("Senha")
 
     def _criar_botoes(self) -> None:
         self.botao_entrar = ft.TextButton(
@@ -241,6 +223,20 @@ class Login(ft.Container):
                 text_style=ft.TextStyle(foreground=ft.Paint(color=ft.Colors.BLACK87))
             ),
             disabled=True
+        )
+
+    def _criar_field(self, label: str, prefix: str=None, filter=None) -> ft.TextField:
+        return ft.TextField(
+            label=label,
+            prefix_text=prefix,
+            border_radius=10,
+            border_color=ft.Colors.BLACK54,
+            cursor_height=15,
+            content_padding=ft.padding.only(top=0, left=10),
+            text_style=ft.TextStyle(foreground=ft.Paint(color=ft.Colors.BLACK54)),
+            label_style=ft.TextStyle(foreground=ft.Paint(color=ft.Colors.BLACK54)),
+            input_filter=filter,
+            on_change=self._liberar_botao_entrar
         )
 
     def _liberar_botao_entrar(self, e: ft.ControlEvent) -> None:
