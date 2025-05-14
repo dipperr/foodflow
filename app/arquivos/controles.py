@@ -109,9 +109,6 @@ class ControleProduto:
         qtd_estoque, estoque_min, preco = self._formatar_valores(qtd_estoque, estoque_min, preco)
         try:
             client = self.db.get_client()
-            
-            if categorias is not None:
-                categorias = [cats["nome"] for cats in categorias]
 
             if fornecedores is not None:
                 fornecedores = [forns["nome"] for forns in fornecedores]
@@ -126,9 +123,7 @@ class ControleProduto:
                         "estoque_minimo": estoque_min,
                         "preco_unidade": preco,
                         "cmv": cmv,
-                        "categorias": {
-                            "nomes": categorias
-                        },
+                        "categorias": categorias,
                         "fornecedores": {
                             "nomes": fornecedores
                         }
@@ -148,10 +143,24 @@ class ControleProduto:
                     qtd_estoque=qtd_estoque,
                     estoque_min=estoque_min,
                     preco=preco,
-                    categorias={"nomes": categorias},
+                    categorias=categorias,
                     fornecedores={"nomes": fornecedores},
                     cmv=cmv
                 )
+
+    def excluir_produto(self, id_produto: int):
+        try:
+            cliente = self.db.get_client()
+            resposta = (
+                cliente.table("produtos")
+                .delete()
+                .eq("id", id_produto)
+                .execute()
+            )
+        except Exception as e:
+            print(e)
+        else:
+            self.visualizacao.atualizar_conteudo()
 
     def gerar_data(self):
         br_tz = pytz.timezone("America/Sao_Paulo")
@@ -224,28 +233,44 @@ class ControleMovimentacao:
         self.visualizacao = visualizacao
         self.db = SupabaseSingleton()
 
-    def atualizar(self, id, classificacao, qtd, valor_unit):
-        qtd, valor_unit = self.formatar_valores(qtd, valor_unit)
+    def atualizar(
+        self,
+        movimentacao_id: int,
+        classificacao: str,
+        qtd_nova: float,
+        qtd_antiga: float,
+        qtd_estoque: float,
+        valor_unit: float,
+        produto_id: int
+    ) -> None:
+        qtd_nova, qtd_antiga, valor_unit = self.formatar_valores(qtd_nova, qtd_antiga, valor_unit)
         try:
             client = self.db.get_client()
             (
                 client.table("movimentacao")
                 .update({
                     "classificacao": classificacao,
-                    "quantidade": qtd,
+                    "quantidade": qtd_nova,
                     "preco_movimentacao": valor_unit
                 })
-                .eq("id", id)
+                .eq("id", movimentacao_id)
                 .execute()
             )
+            if qtd_nova != qtd_antiga:
+                nova_qtd = qtd_estoque + (qtd_antiga - qtd_nova)
+                (
+                    client.table("produtos")
+                    .update({
+                        "quantidade": nova_qtd
+                    })
+                    .eq("id", produto_id)
+                    .execute()
+                )
+
         except Exception as e:
             print(e)
         else:
-            self.visualizacao.atualizar_infos(
-                classificacao,
-                float(qtd),
-                float(valor_unit)
-            )
+            self.visualizacao.atualizar_conteudo()
 
     def registrar(
         self,
@@ -266,12 +291,6 @@ class ControleMovimentacao:
         try:
             client = self.db.get_client()
             (
-                client.table("produtos")
-                .update({"quantidade": qtd_produto})
-                .eq("id", id_produto)
-                .execute()
-            )
-            (
                 client.table("movimentacao")
                 .insert({
                     "empresa_id": InfosGlobal().empresa_id,
@@ -287,13 +306,19 @@ class ControleMovimentacao:
                 })
                 .execute()
             )
+            (
+                client.table("produtos")
+                .update({"quantidade": qtd_produto})
+                .eq("id", id_produto)
+                .execute()
+            )
         except Exception as e:
             print(e)
         else:
-            self.visualizacao.atualizar_conteudo(qtd_estoque=qtd_produto)
+            self.visualizacao.atualizar_conteudo()
 
     def formatar_valores(self, *args: str):
-        return [valor.replace(",", ".").removeprefix("R$ ") for valor in args]
+        return [float(str(valor).replace(",", ".").removeprefix("R$ ")) for valor in args]
     
     def formatar_data_movimentacao(self, dt):
         try:

@@ -237,25 +237,7 @@ class LinhaTabelaProdutos(ft.DataRow):
                                 )
                             ])
                         ], col=4.1),
-                        ft.Container(
-                            ft.Column([
-                                ft.Text("Comprar", color=ft.Colors.BLACK54, size=13, max_lines=1, overflow=ft.TextOverflow),
-                                ft.ResponsiveRow([
-                                    self.qtd_comprar,
-                                    ft.Text(
-                                        self.produto.unidade,
-                                        size=13,
-                                        weight=ft.FontWeight.BOLD,
-                                        col=4
-                                    )
-                                ], alignment=ft.MainAxisAlignment.CENTER, vertical_alignment=ft.CrossAxisAlignment.CENTER)
-                            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=5),
-                            col=2,
-                            bgcolor=ft.Colors.BLUE_100,
-                            border_radius=5,
-                            padding=ft.padding.all(5),
-                            border=ft.border.all(1, ft.Colors.BLUE)
-                        ),
+                        self.cartao_quantidade,
                         ft.Column([
                             ft.ResponsiveRow([
                                 self.botao_add,
@@ -289,6 +271,25 @@ class LinhaTabelaProdutos(ft.DataRow):
             border_color=ft.Colors.BLACK54,
             cursor_color=ft.Colors.BLACK54
         )
+        self.cartao_quantidade = ft.Container(
+            ft.Column([
+                ft.Text("Comprar", color=ft.Colors.BLACK54, size=13, max_lines=1, overflow=ft.TextOverflow),
+                ft.ResponsiveRow([
+                    self.qtd_comprar,
+                    ft.Text(
+                        self.produto.unidade,
+                        size=13,
+                        weight=ft.FontWeight.BOLD,
+                        col=4
+                    )
+                ], alignment=ft.MainAxisAlignment.CENTER, vertical_alignment=ft.CrossAxisAlignment.CENTER)
+            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=5),
+            col=2,
+            bgcolor=ft.Colors.BLUE_100,
+            border_radius=5,
+            padding=ft.padding.all(5),
+            border=ft.border.all(1, ft.Colors.BLUE)
+        )
 
     def _criar_botoes(self) -> None:
         self.botao_add = BotaoTonal(
@@ -318,7 +319,7 @@ class LinhaTabelaProdutos(ft.DataRow):
 
     def visibilidade_elementos(self, visibilidade: bool) -> None:
         elementos = [
-            (self.entrada_quantidade, visibilidade),
+            (self.cartao_quantidade, visibilidade),
             (self.botao_add, visibilidade),
             (self.botao_remove, not visibilidade),
         ]

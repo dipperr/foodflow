@@ -38,6 +38,7 @@ class JanelaExcluir(ft.AlertDialog):
         self._criar_conteudo()
 
     def _criar_conteudo(self) -> None:
+        self._criar_botoes()
         self.content = ft.Container(
             ft.Column([
                 ft.Text(f"Deseja excluir a ficha técnica {self.ficha["nome"]}?"),
@@ -52,26 +53,22 @@ class JanelaExcluir(ft.AlertDialog):
 
     def _criar_botoes(self) -> None:
         self.botao_sim = ft.OutlinedButton(
-            content=ft.ResponsiveRow([
-                ft.Image("./icons_clone/pencil.png", width=14, height=14, col=3),
-                ft.Text("SIM", col=7, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, color=ft.Colors.BLACK87, size=14)
-            ], alignment=ft.MainAxisAlignment.CENTER, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            text="SIM",
             col=4,
             style=ft.ButtonStyle(
                 bgcolor=ft.Colors.BLUE_100,
-                side=ft.BorderSide(color=ft.Colors.WHITE, width=1)
+                side=ft.BorderSide(color=ft.Colors.WHITE, width=1),
+                text_style=ft.TextStyle(foreground=ft.Paint(ft.Colors.BLACK), weight=ft.FontWeight.W_500)
             ),
             on_click=self.sim
         )
         self.botao_nao = ft.OutlinedButton(
-            content=ft.ResponsiveRow([
-                ft.Image("./icons_clone/trash.png", width=14, height=14, col=3, color=ft.Colors.RED),
-                ft.Text("NÃO", col=8, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, color=ft.Colors.RED, size=14, weight=ft.FontWeight.NORMAL)
-            ], alignment=ft.MainAxisAlignment.CENTER, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            text="NÃO",
             col=4,
             style=ft.ButtonStyle(
                 bgcolor=ft.Colors.WHITE,
-                side=ft.BorderSide(color=ft.Colors.WHITE, width=1)
+                side=ft.BorderSide(color=ft.Colors.WHITE, width=1),
+                text_style=ft.TextStyle(foreground=ft.Paint(ft.Colors.RED), weight=ft.FontWeight.W_500)
             ),
             on_click=self.nao
         )

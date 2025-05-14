@@ -21,6 +21,7 @@ from componentes import (
 
 locale.setlocale(locale.LC_ALL, "pt_BR.UTF-8")
 
+pd.set_option('display.max_columns', None)
 
 class Graficos:
     def __init__(self) -> None:
@@ -40,7 +41,7 @@ class Graficos:
             "entradas": {
                 "sem class.": "#ffeb3b",
                 "compras": "#4caf50",
-                "desperdício": "#e57373",
+                "transferência": "#e57373",
             },
         }
         return paleta.get(tipo, {}).get(classificacao, "blue")
@@ -192,13 +193,16 @@ class OperadorDados:
     
     @staticmethod
     def calcular_cmv_real(df: pd.DataFrame) -> float:
-        return df[df["operacao"] == "saída"]["total_movimentado"].sum()
+        saidas = df[df["operacao"] == "saída"]
+        filtro_class = saidas["classificacao"].isin(["vendas", "desperdício", "sem class."])
+        return saidas[filtro_class]["total_movimentado"].sum()
     
     @staticmethod
     def dados_grafico_cmv(df: pd.DataFrame) -> pd.DataFrame:
         saidas = df[df["operacao"] == "saída"]
+        filtro_class = saidas["classificacao"].isin(["vendas", "desperdício", "sem class."])
         agrupado = (
-            saidas
+            saidas[filtro_class]
             .groupby(["categorias", "classificacao"])["total_movimentado"]
             .sum()
             .reset_index()
@@ -208,13 +212,16 @@ class OperadorDados:
 
     @staticmethod
     def valor_total_entradas(df: pd.DataFrame) -> pd.DataFrame:
-        return df[df["operacao"] == "entrada"]["total_movimentado"].sum()
+        entradas = df[df["operacao"] == "entrada"]
+        filtro_class = entradas["classificacao"].isin(["compras", "transferência", "sem class."])
+        return entradas[filtro_class]["total_movimentado"].sum()
     
     @staticmethod
     def dados_grafico_entradas(df: pd.DataFrame) -> pd.DataFrame:
         entradas = df[df["operacao"] == "entrada"]
+        filtro_class = entradas["classificacao"].isin(["compras", "transferência", "sem class."])
         return (
-            entradas
+            entradas[filtro_class]
             .groupby("classificacao")["total_movimentado"]
             .sum()
             .reset_index()
@@ -268,7 +275,7 @@ class OperadorDados:
     
     @staticmethod
     def dados_grafico_volatilidade(df: pd.DataFrame, produto: str) -> pd.DataFrame:
-        df_filtrado = df[(df["operacao"] == "entrada") & (df["nome"] == produto)]
+        df_filtrado = df[df["nome"] == produto]
         return df_filtrado.sort_values("data_movimentacao")
 
 

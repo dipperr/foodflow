@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+from banco_de_dados import SupabaseSingleton
 
 
 UNIDADES = [
@@ -45,6 +46,20 @@ class Produto:
         self.fornecedores = fornecedores
         self.cmv = cmv
 
+    def atualizar_qtd(self):
+        try:
+            cliente = SupabaseSingleton().get_client()
+            resposta = (
+                cliente.table("produtos")
+                .select("quantidade")
+                .eq("id", self.id)
+                .execute()
+            ).data
+        except Exception as e:
+            print(e)
+        else:
+            self.qtd_estoque = resposta[0]["quantidade"]
+
 
 class Empresa:
     def __init__(self, id, nome):
@@ -84,7 +99,9 @@ class Movimentacao:
         qtd: float,
         unidade: str,
         valor_unit: float,
-        mensagem: str
+        mensagem: str,
+        produto_id: Optional[int]=None,
+        qtd_estoque: Optional[float]=None
     ):
         self.id = id
         self.operacao  = operacao
@@ -95,3 +112,5 @@ class Movimentacao:
         self.unidade = unidade
         self.valor_unit = valor_unit
         self.mensagem = mensagem
+        self.produto_id = produto_id
+        self.qtd_estoque = qtd_estoque

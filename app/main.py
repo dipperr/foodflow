@@ -328,10 +328,7 @@ class App(ft.Container):
             margin=ft.margin.all(0),
             alignment=ft.alignment.top_left
         )
-        self.content = Login(ControleConteudo(self))
-        # usuario = Usuario(1, "Luiz Henique", "556792300729")
-        # usuario.empresas = [Empresa(1, "Ebi sushi")]
-        # self.iniciar_app(usuario)
+        # self.content = Login(ControleConteudo(self))
 
     def alterar_pagina(self, label):
         paginas = {
@@ -362,8 +359,10 @@ class App(ft.Container):
         self.content = Login(ControleConteudo(self))
         self.update()
 
-    # def did_mount(self):
-    #     self.area.atualizar_conteudo(Painel())
+    def did_mount(self):
+        usuario = Usuario(1, "Luiz Henique", "556792300729")
+        usuario.empresas = [Empresa(1, "Ebi sushi")]
+        self.iniciar_app(usuario)
 
 
 def main(page):

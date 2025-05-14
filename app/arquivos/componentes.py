@@ -123,19 +123,27 @@ class TextoMonetario(ft.ResponsiveRow):
 class GradeNotificacao(ft.ResponsiveRow):
     def __init__(self, itens: list, num_colunas: int=2):
         super().__init__()
-        
-        itens_por_coluna = len(itens) // num_colunas
-        restante = len(itens) % num_colunas
+        self.num_colunas = num_colunas
+        self.itens = itens
+        self._criar_conteudo()
+
+    def _criar_conteudo(self):
+        itens_por_coluna = len(self.itens) // self.num_colunas
+        restante = len(self.itens) % self.num_colunas
 
         colunas = []
-        for i in range(num_colunas):
+        for i in range(self.num_colunas):
             inicio = i * itens_por_coluna + min(i, restante)
             fim = (i + 1) * itens_por_coluna + min(i + 1, restante)
             
-            coluna = ft.Column([item for item in itens[inicio:fim]], col=12 // num_colunas)
+            coluna = ft.Column([item for item in self.itens[inicio:fim]], col=12 // self.num_colunas)
             colunas.append(coluna)
         
         self.controls = colunas
+
+    def reiniciar_grade(self):
+        self._criar_conteudo()
+        self.update()
 
 
 class CartaoNotificacao(ft.Card):
@@ -289,7 +297,8 @@ class Filtro(ft.Container):
             rotulo: str,
             itens: List[str],
             checked: int=None,
-            mostrar_botao: Callable[[None], None]=None
+            mostrar_botao: Callable[[None], None]=None,
+            acao: Callable[[str], None]=None
         ) -> None:
         super().__init__(
             col=3,
@@ -300,6 +309,7 @@ class Filtro(ft.Container):
         )
 
         self.mostrar_botao = mostrar_botao
+        self.acao = acao
         self.checked = checked
         self.itens = itens
         self.menu = ft.PopupMenuButton(
@@ -332,6 +342,8 @@ class Filtro(ft.Container):
             item.checked = (item.text == e.control.text)
 
         self.menu.update()
+        if self.acao is not None:
+            self.acao(e.control.text)
 
     def limpar(self) -> None:
         for item in self.menu.items:
@@ -459,10 +471,10 @@ class FiltroEntrada(ft.InputFilter):
 
 
 class JanelaEditarMovimentacao(ft.AlertDialog):
-    def __init__(self, movimentacao, controle) -> None:
+    def __init__(self, movimentacao, controle_movimentacoes) -> None:
         super().__init__(modal=True, bgcolor=ft.Colors.WHITE,)
         self.movimentacao = movimentacao
-        self.controle = controle
+        self.controle_movimentacoes = controle_movimentacoes
         self._criar_conteudo()
 
     def _criar_conteudo(self) -> None:
@@ -634,11 +646,14 @@ class JanelaEditarMovimentacao(ft.AlertDialog):
         self.entrada_classificar_acao.update()
 
     def salvar_movimentacao(self, e: ft.ControlEvent) -> None:
-        self.controle.atualizar(
+        self.controle_movimentacoes.atualizar(
             self.movimentacao.id,
             self.entrada_classificar_acao.value,
             self.entrada_qtd.value,
-            self.entrada_preco.value
+            self.movimentacao.qtd,
+            self.movimentacao.qtd_estoque,
+            self.entrada_preco.value,
+            self.movimentacao.produto_id
         )
         self.page.close(self)
 
@@ -646,13 +661,69 @@ class JanelaEditarMovimentacao(ft.AlertDialog):
         self._acao(self.movimentacao.operacao.lower())
 
 
+class JanelaCancelarMovimentacao(ft.AlertDialog):
+    def __init__(self, movimentacao_id, controle_acao) -> None:
+        super().__init__(
+            modal=True,
+            bgcolor=ft.Colors.WHITE,
+            title=ft.Text("Cancelar movimentação"),
+            actions_padding=ft.padding.all(0)
+        )
+        self.movimentacao_id = movimentacao_id
+        self.controle_acao = controle_acao
+        self._criar_conteudo()
+
+    def _criar_conteudo(self) -> None:
+        self._criar_botoes()
+        self.content = ft.Container(
+            ft.Column([
+                ft.Text("Confirma o cancelamento da movimentação?"),
+                ft.ResponsiveRow([
+                    self.botao_sim,
+                    self.botao_nao,
+                ], alignment=ft.MainAxisAlignment.END)
+            ], spacing=20),
+            width=400,
+            height=70
+        )
+
+    def _criar_botoes(self) -> None:
+        self.botao_sim = ft.OutlinedButton(
+            text="SIM",
+            col=4,
+            style=ft.ButtonStyle(
+                bgcolor=ft.Colors.BLUE_100,
+                side=ft.BorderSide(color=ft.Colors.WHITE, width=1),
+                text_style=ft.TextStyle(foreground=ft.Paint(ft.Colors.BLACK), weight=ft.FontWeight.W_500)
+            ),
+            on_click=self.sim
+        )
+        self.botao_nao = ft.OutlinedButton(
+            text="NÃO",
+            col=4,
+            style=ft.ButtonStyle(
+                bgcolor=ft.Colors.WHITE,
+                side=ft.BorderSide(color=ft.Colors.WHITE, width=1),
+                text_style=ft.TextStyle(foreground=ft.Paint(ft.Colors.RED), weight=ft.FontWeight.W_500)
+            ),
+            on_click=self.nao
+        )
+
+    def nao(self, e: ft.ControlEvent) -> None:
+        self.page.close(self)
+
+    def sim(self, e: ft.ControlEvent) -> None:
+        ...
+
+
 class LinhaHistorico(ft.ExpansionTile):
-    def __init__(self, movimentacao):
+    def __init__(self, movimentacao, controle_painel=None):
         super().__init__(
             title=ft.Row(),
             shape=ft.RoundedRectangleBorder(0)
         )
         self.movimentacao = movimentacao
+        self.controle_painel = controle_painel
         self._criar_conteudo()
 
     def _criar_conteudo(self) -> None:
@@ -795,6 +866,9 @@ class LinhaHistorico(ft.ExpansionTile):
         campo.update()
 
     def abrir_janela_edicao(self, e: ft.ControlEvent) -> None:
-        controle = ControleMovimentacao(self)
+        controle = ControleMovimentacao(self.controle_painel)
         janela = JanelaEditarMovimentacao(self.movimentacao, controle)
         self.page.open(janela)
+
+    def _abrir_janela_cancelar(self, e: ft.ControlEvent) -> None:
+        ...

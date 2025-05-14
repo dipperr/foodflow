@@ -31,14 +31,14 @@ from componentes import (
     Filtro,
     DropdownV2,
     FiltroEntrada,
-    LinhaHistorico
+    LinhaHistorico,
 )
 
 locale.setlocale(locale.LC_ALL, "pt_BR.UTF-8")
 
 
 class FiltrosEstoque(ft.ResponsiveRow):
-    def __init__(self) -> None:
+    def __init__(self, controle_grade) -> None:
         super().__init__(
             controls=[
                 Filtro(
@@ -68,7 +68,8 @@ class FiltrosEstoque(ft.ResponsiveRow):
                         "Valor do estoque (crescente)",
                         "Valor do estoque (decrescente)"
                     ],
-                    checked=0
+                    checked=0,
+                    acao=self.acao_ordenar_por
                 ),
                 ft.FilledTonalButton(
                     content=ft.ResponsiveRow([
@@ -82,6 +83,7 @@ class FiltrosEstoque(ft.ResponsiveRow):
                 )
             ]
         )
+        self.controle_grade = controle_grade
 
     def limpar_filtros(self, e: ft.ControlEvent) -> None:
         for filtro in self.controls[:-2]:
@@ -92,6 +94,9 @@ class FiltrosEstoque(ft.ResponsiveRow):
     def mostrar_botao(self) -> None:
         self.controls[-1].visible = True
         self.controls[-1].update()
+
+    def acao_ordenar_por(self, valor) -> None:
+        self.controle_grade.filtrar_grade(valor)
 
 
 class OperadorProduto:
@@ -184,7 +189,7 @@ class JanelaRegistrarMovimentacao(ft.AlertDialog):
                         ], spacing=10)
                     ], spacing=20, scroll=ft.ScrollMode.ALWAYS), expand=True
                 )
-            ], spacing=5), height=410, width=500
+            ], spacing=5), height=430, width=600
         )
 
     def _criar_entradas(self):
@@ -292,7 +297,7 @@ class JanelaRegistrarMovimentacao(ft.AlertDialog):
         self._atualizar_visibilidade(self.entrada_dt_validade, False)
 
     def _acao_entrada(self) -> None:
-        self._definir_opcoes(self.entrada_classificar_acao, ["Compras", "Produção", "Tranferência"])
+        self._definir_opcoes(self.entrada_classificar_acao, ["Compras", "Produção", "Transferência"])
         self._atualizar_visibilidade(self.entrada_preco, True)
         self._atualizar_visibilidade(self.entrada_dt_validade, True)
 
@@ -322,6 +327,7 @@ class JanelaRegistrarMovimentacao(ft.AlertDialog):
             self.entrada_preco.value,
             self.entrada_dt_validade.value
         )
+        self.page.close(self)
 
 
 class JanelaEditarProduto(ft.AlertDialog):
@@ -398,7 +404,7 @@ class JanelaEditarProduto(ft.AlertDialog):
                         ], spacing=10)
                     ], spacing=20, scroll=ft.ScrollMode.ALWAYS), expand=True
                 )
-            ], spacing=5), height=500, width=500
+            ], spacing=5), height=700, width=600
         )
 
     def _criar_entradas(self, categorias: List, fornecedores: List) -> None:
@@ -431,7 +437,8 @@ class JanelaEditarProduto(ft.AlertDialog):
             6,
             "Preço de custo por unidade do produto (campo opcional)",
             value=locale.currency(preco, grouping=True, symbol=False),
-            input_filter=FiltroEntrada()
+            input_filter=FiltroEntrada(),
+            prefix="R$ "
         )
         self.entrada_unidade = ft.Dropdown(
             options=[
@@ -462,7 +469,7 @@ class JanelaEditarProduto(ft.AlertDialog):
         if self.produto.categorias is not None:
             ids_categorias = [cat["id"] for cat in categorias if cat["nome"] in self.produto.categorias.keys()]
         
-        if self.produto.fornecedores["nomes"] is not None:
+        if self.produto.fornecedores is not None:
             ids_fornecedores = [forn["id"] for forn in fornecedores if forn["nome"] in self.produto.fornecedores["nomes"]]
 
         return ids_categorias, ids_fornecedores
@@ -534,6 +541,7 @@ class JanelaEditarProduto(ft.AlertDialog):
 
     def salvar_produto(self, e: ft.ControlEvent) -> None:
         if self.controle_produto is not None:
+            categorias = self._obter_categorias()
             self.controle_produto.atualizar_produto(
                 self.produto.id,
                 self.entrada_nome_produto.value,
@@ -541,10 +549,19 @@ class JanelaEditarProduto(ft.AlertDialog):
                 self.entrada_qtd_estoque.value,
                 self.entrada_estoque_min.value,
                 self.entrada_preco_unidade.value,
-                self.entrada_categoria.value,
+                categorias,
                 self.entrada_fornecedores.value,
                 self.check_sim.value
             )
+            self.page.close(self)
+
+    def _obter_categorias(self) -> Optional[dict]:
+        if not self.entrada_categoria.value:
+            return None
+        return {
+            cat["nome"]: self.infos_categorias[cat["id"]]
+            for cat in self.entrada_categoria.value
+        }
 
     def ler_dados(self) -> None:
         try:
@@ -565,6 +582,7 @@ class JanelaEditarProduto(ft.AlertDialog):
         except Exception as e:
             print(e)
         else:
+            self.infos_categorias = {cat["id"]: cat["cor"] for cat in categorias}
             self._criar_conteudo(categorias, fornecedores)
 
 
@@ -596,7 +614,7 @@ class JanelaCadCategoria(ft.AlertDialog):
                     self.botao_cancelar,
                     self.botao_criar_categoria
                 ], alignment=ft.MainAxisAlignment.END)
-            ]), height=250, width=500
+            ]), height=250, width=600
         )
 
     def _criar_entradas(self) -> None:
@@ -695,7 +713,7 @@ class JanelaCadFornecedor(ft.AlertDialog):
                     self.botao_cancelar,
                     self.botao_criar
                 ], alignment=ft.MainAxisAlignment.END)
-            ], spacing=15, scroll=ft.ScrollMode.ALWAYS), height=460, width=500
+            ], spacing=15, scroll=ft.ScrollMode.ALWAYS), height=470, width=600
         )
 
     def _criar_entradas(self) -> None:
@@ -825,7 +843,7 @@ class JanelaCadProduto(ft.AlertDialog):
                         ], spacing=10)
                     ], spacing=20, scroll=ft.ScrollMode.ALWAYS), expand=True
                 )
-            ], spacing=5), height=500, width=500
+            ], spacing=5), height=700, width=600
         )
 
     def _criar_entradas(self, categorias: List, fornecedores: List) -> None:
@@ -849,7 +867,8 @@ class JanelaCadProduto(ft.AlertDialog):
             "PREÇO POR UNIDADE",
             6,
             "Preço de custo por unidade do produto (campo opcional)",
-            input_filter=FiltroEntrada()
+            input_filter=FiltroEntrada(),
+            prefix="R$ "
         )
         self.entrada_unidade = ft.Dropdown(
             options=[
@@ -950,13 +969,13 @@ class JanelaCadProduto(ft.AlertDialog):
         return any(produto_str == "".join(nu) for nu in self.nome_unidade)
 
     def janela_add_categoria(self, e: ft.ControlEvent) -> None:
-        janela = JanelaCadCategoria(ControleDropdownV2(self.f_categoria))
+        janela = JanelaCadCategoria(ControleDropdownV2(self.entrada_categoria))
         controle = ControleCategoria(visualizacao=janela)
         janela.definir_controle(controle)
         self.page.open(janela)
 
     def janela_add_fornecedor(self, e: ft.ControlEvent) -> None:
-        janela = JanelaCadFornecedor(ControleDropdownV2(self.f_fornecedores))
+        janela = JanelaCadFornecedor(ControleDropdownV2(self.entrada_fornecedores))
         controle = ControleFornecedores(visualizacao=janela)
         janela.definir_controle(controle)
         self.page.open(janela)
@@ -1010,6 +1029,81 @@ class JanelaCadProduto(ft.AlertDialog):
             self._criar_conteudo(categorias, fornecedores)
 
 
+class ControleAcaoExcluir:
+    def __init__(self, pagina_estoque, painel) -> None:
+        self.pagina_estoque = pagina_estoque
+        self.painel = painel
+
+    def atualizar_conteudo(self) -> None:
+        self.painel.fechar_janela(None)
+        self.pagina_estoque.atualizar_dados()
+
+
+class ControleAcoesPainel:
+    def __init__(self, painel):
+        self.painel = painel
+
+    def atualizar_conteudo(self):
+        self.painel.atualizar_conteudo()
+
+
+class JanelaExcluirProduto(ft.AlertDialog):
+    def __init__(self, produto_id, controle_acao) -> None:
+        super().__init__(
+            modal=True,
+            bgcolor=ft.Colors.WHITE,
+            title=ft.Text("Excluir produto"),
+            actions_padding=ft.padding.all(0)
+        )
+        self.produto_id = produto_id
+        self.controle_acao = controle_acao
+        self._criar_conteudo()
+
+    def _criar_conteudo(self) -> None:
+        self._criar_botoes()
+        self.content = ft.Container(
+            ft.Column([
+                ft.Text("Deseja excluir o produto?"),
+                ft.ResponsiveRow([
+                    self.botao_sim,
+                    self.botao_nao,
+                ], alignment=ft.MainAxisAlignment.END)
+            ], spacing=20),
+            width=400,
+            height=70
+        )
+
+    def _criar_botoes(self) -> None:
+        self.botao_sim = ft.OutlinedButton(
+            text="SIM",
+            col=4,
+            style=ft.ButtonStyle(
+                bgcolor=ft.Colors.BLUE_100,
+                side=ft.BorderSide(color=ft.Colors.WHITE, width=1),
+                text_style=ft.TextStyle(foreground=ft.Paint(ft.Colors.BLACK), weight=ft.FontWeight.W_500)
+            ),
+            on_click=self.sim
+        )
+        self.botao_nao = ft.OutlinedButton(
+            text="NÃO",
+            col=4,
+            style=ft.ButtonStyle(
+                bgcolor=ft.Colors.WHITE,
+                side=ft.BorderSide(color=ft.Colors.WHITE, width=1),
+                text_style=ft.TextStyle(foreground=ft.Paint(ft.Colors.RED), weight=ft.FontWeight.W_500)
+            ),
+            on_click=self.nao
+        )
+
+    def nao(self, e: ft.ControlEvent) -> None:
+        self.page.close(self)
+
+    def sim(self, e: ft.ControlEvent) -> None:
+        controle = ControleProduto(visualizacao=self.controle_acao)
+        controle.excluir_produto(self.produto_id)
+        self.page.close(self)
+
+
 class PainelInfos(ft.Container):
     def __init__(self, controle_sombra) -> None:
         super().__init__(
@@ -1018,8 +1112,8 @@ class PainelInfos(ft.Container):
             bgcolor=ft.Colors.GREY_100
         )
         self.controle_sombra = controle_sombra
+        self.controle_acao = None
         self.produto = None
-        self.janela = None
 
     def criar_conteudo(self) -> None:
         op = OperadorProduto(self.produto)
@@ -1070,19 +1164,24 @@ class PainelInfos(ft.Container):
                 2,
                 ft.Colors.WHITE,
                 icon_color=ft.Colors.RED,
-                text_color=ft.Colors.RED
+                text_color=ft.Colors.RED,
+                on_click=self._excluir
             )
         ])
 
     def _registrar_movimentacao(self, e: ft.ControlEvent) -> None:
-        controle = ControleMovimentacao(self)
-        self.janela = JanelaRegistrarMovimentacao(self.produto, controle)
-        self.page.open(self.janela)
+        controle = ControleMovimentacao(ControleAcoesPainel(self))
+        janela = JanelaRegistrarMovimentacao(self.produto, controle)
+        self.page.open(janela)
 
     def _editar_produto(self, e: ft.ControlEvent) -> None:
         controle = ControleProduto(visualizacao=self)
-        self.janela = JanelaEditarProduto(self.produto, controle)
-        self.page.open(self.janela)
+        janela = JanelaEditarProduto(self.produto, controle)
+        self.page.open(janela)
+
+    def _excluir(self, e: ft.ControlEvent) -> None:
+        janela = JanelaExcluirProduto(self.produto.id, self.controle_acao)
+        self.page.open(janela)
 
     def _cartoes(
         self,
@@ -1183,7 +1282,9 @@ class PainelInfos(ft.Container):
                     mov["quantidade"],
                     self.produto.unidade,
                     self.obter_preco(mov["preco_movimentacao"]),
-                    mov["informacoes"]
+                    mov["informacoes"],
+                    self.produto.id,
+                    self.produto.qtd_estoque
                 ]
                 for mov in respostas
             ]
@@ -1192,7 +1293,7 @@ class PainelInfos(ft.Container):
                 ft.Card(
                     ft.Container(
                         ft.Column([
-                            LinhaHistorico(Movimentacao(*dado))
+                            LinhaHistorico(Movimentacao(*dado), ControleAcoesPainel(self))
                             for dado in respostas_form
                         ]),
                         padding=ft.padding.symmetric(vertical=10, horizontal=0),
@@ -1206,14 +1307,8 @@ class PainelInfos(ft.Container):
         return preco_mov if pd.notna(preco_mov) else self.produto.preco
 
     def atualizar_conteudo(self, **kwars) -> None:
-        if self.janela is not None:
-            self.page.close(self.janela)
-            self.janela = None
-
-        for k, v in kwars.items():
-            setattr(self.produto, k, v)
-
         self.placeholder()
+        self.produto.atualizar_qtd()
         self.criar_conteudo()
         self.update()
 
@@ -1236,6 +1331,9 @@ class PainelInfos(ft.Container):
         self.visible = True
         self.update()
 
+    def definir_controle_acao(self, controle):
+        self.controle_acao = controle 
+
 
 class ControlePainelInfos:
     def __init__(self, painel_infos, controle_sombra) -> None:
@@ -1252,7 +1350,20 @@ class CartaoItem(ft.Card):
         super().__init__(col=4, elevation=10)
         self.produto = produto
         self.controle_painel_infos = controle_painel_infos
+        self._valor_estoque = 0
         self._criar_conteudo()
+
+    @property
+    def nome(self) -> str:
+        return self.produto.nome
+
+    @property
+    def preco(self) -> float:
+        return float(self.produto.preco)
+    
+    @property
+    def valor_estoque(self) -> float:
+        return float(self._valor_estoque)
 
     def _criar_conteudo(self) -> None:
         self.content = ft.Container(
@@ -1285,7 +1396,7 @@ class CartaoItem(ft.Card):
 
     def _criar_corpo(self) -> ft.Column:
         op = OperadorProduto(self.produto)
-        preco, valor_estoque, qtd_estoque, estoque_min = op.formatar_valores()
+        preco, self._valor_estoque, qtd_estoque, estoque_min = op.formatar_valores()
         return ft.Column([
             op.obter_fornecedores(),
             op.obter_categorias(),
@@ -1346,7 +1457,7 @@ class CartaoItem(ft.Card):
                         overflow=ft.TextOverflow.ELLIPSIS
                     ),
                     ft.Text(
-                        locale.currency(valor_estoque, grouping=True),
+                        locale.currency(self._valor_estoque, grouping=True),
                         size=17,
                         color=ft.Colors.BLACK87,
                         weight=ft.FontWeight.W_600
@@ -1358,6 +1469,31 @@ class CartaoItem(ft.Card):
     def abrir_configuracoes(self, e: ft.ControlEvent) -> None:
         self.controle_painel_infos.abrir_janela(self.produto)
 
+    def alterar_visibilidade(self, visibilidade: bool) -> None:
+        self.visible = visibilidade
+        self.update()
+
+
+class ControleGradeItem:
+    def __init__(self, grade):
+        self.grade = grade
+
+    def filtrar_grade(self, valor):
+        criterios = {
+            "Alfabética (decrescente)":    ("nome", True),
+            "Alfabética (crescente)":      ("nome", False),
+            "Preço unit. (decrescente)":   ("preco", True),
+            "Preço unit. (crescente)":     ("preco", False),
+            "Valor do estoque (decrescente)": ("valor_estoque", True),
+            "Valor do estoque (crescente)":   ("valor_estoque", False),
+        }
+
+        criterio = criterios.get(valor)
+        if criterio:
+            chave, reverso = criterio
+            self.grade.itens = sorted(self.grade.itens, key=lambda item: getattr(item, chave), reverse=reverso)
+            self.grade.reiniciar_grade()
+
 
 class Estoque(ft.Stack):
     def __init__(self, controle_sombra) -> None:
@@ -1366,10 +1502,11 @@ class Estoque(ft.Stack):
         self.painel_infos = PainelInfos(controle_sombra)
         self.area_produtos = ft.Container(expand=True)
         self.produtos = None
+        self.painel_infos.definir_controle_acao(ControleAcaoExcluir(self, self.painel_infos))
 
     def _criar_conteudo(self) -> None:
         self.expand = False
-        valor_total, total_produtos = self._obter_estatisticas()
+        valor_total, total_produtos, total_categoria = self._obter_estatisticas()
         self._criar_grade_itens()
 
         self.coluna_area = ft.Column([
@@ -1399,14 +1536,14 @@ class Estoque(ft.Stack):
                             CartaoIndicadores(
                                 "categorias",
                                 ft.ResponsiveRow([
-                                    ft.Text("0",  size=30, weight=ft.FontWeight.BOLD, col=12)
+                                    ft.Text(total_categoria,  size=30, weight=ft.FontWeight.BOLD, col=12)
                                 ]),
                                 4
                             )
                         ]),
                         GradeNotificacao(self._cartoes_notificacoes(), 3),
                         ft.Divider(),
-                        FiltrosEstoque(),
+                        FiltrosEstoque(ControleGradeItem(self.grade_itens)),
                         ft.Divider(),
                         ft.ResponsiveRow([
                             ft.Container(
@@ -1421,7 +1558,10 @@ class Estoque(ft.Stack):
                                 ]), col=10
                             )
                         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                        self.grade_itens
+                        ft.Container(
+                            self.grade_itens,
+                            expand=True
+                        )
                     ], col=12)
                 ]),
                 padding=ft.padding.all(20)
@@ -1441,8 +1581,7 @@ class Estoque(ft.Stack):
         self.update()
 
     def _criar_grade_itens(self) -> None:
-        self.grade_itens = ft.Container(
-            GradeNotificacao([
+        self.grade_itens = GradeNotificacao([
                 CartaoItem(
                     Produto(
                         row["id"],
@@ -1458,7 +1597,7 @@ class Estoque(ft.Stack):
                     ControlePainelInfos(self.painel_infos, self.controle_sombra)
                 )
                 for _, row in self.df.iterrows()
-            ], 3), expand=True
+            ], 3
         )
 
     def _cartoes_notificacoes(self) -> List[CartaoNotificacao]:
@@ -1529,9 +1668,10 @@ class Estoque(ft.Stack):
         if len(self.df) > 0:
             valor_total = (self.df['quantidade'] * self.df['preco_unidade']).dropna().sum()
             total_produtos = len(self.df)
+            total_categoria = len(set([cat for i, row in self.df.iterrows() for cat in row["categorias"].keys()]))
         else:
-            valor_total = total_produtos = 0
-        return valor_total, total_produtos
+            valor_total = total_produtos = total_categoria = 0
+        return valor_total, total_produtos, total_categoria
     
     def rolar(self, e: ft.ControlEvent) -> None:
         self.coluna_area.scroll_to(delta=400, duration=1000)

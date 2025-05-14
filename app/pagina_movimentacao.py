@@ -204,8 +204,8 @@ class PaginaMovimentacao(ft.Column):
         df_base = pd.DataFrame(dados)
         produtos_df = pd.json_normalize(df_base['produtos'])
         df = pd.concat([df_base.drop(columns=['produtos']), produtos_df], axis=1)
-        df["classificacao"].fillna("Sem class.", inplace=True)
-        df["preco_movimentacao"].fillna(df["preco_unidade"], inplace=True)
+        df["classificacao"] = df["classificacao"].fillna("Sem class.")
+        df["preco_movimentacao"] = df["preco_movimentacao"].fillna(df["preco_unidade"])
         df["total_movimentado"] = df["quantidade"] * df["preco_movimentacao"]
         df["operacao"] = df["operacao"].str.lower()
 
